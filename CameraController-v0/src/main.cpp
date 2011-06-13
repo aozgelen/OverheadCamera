@@ -67,6 +67,7 @@ int main(int argc, char **argv)
     string server_hostname = "";// = "localhost";
     int cameraNum = -1;
     const char* filepath = "../../../config_files/robot.conf";
+	//const char* filepath = "../../config_files/robot.conf";
     ifstream configfile(filepath);
     
     if (!configfile){
@@ -113,20 +114,24 @@ int main(int argc, char **argv)
       return 1;
     }
 	
-    string delete1 = "test";
     
     //OHCamera cam(delete1, delete1, delete1, delete1);
     OHCamera cam(cameraNum);
 
 	
     if(!cam.connect(server_hostname, server_port)){
-        return 0;
+        return 1;
     }
+	cam.startCamera();
+	
+	//cam.cameraThread = new boost::thread(&OHCamera::imageLoop, &cam);
+	cam.cameraThread = new boost::thread(&OHCamera::camBeat, &cam);
+	cout << "Thread created" << endl;
 	
     // Main Loop
     while (cam.getState() != STATE_QUIT) {
 		cam.update();
-		usleep(1);
+		//usleep(1);
     }
 	
     return 0;

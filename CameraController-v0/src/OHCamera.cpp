@@ -1,6 +1,6 @@
-/*! 
- * \file   OHCamera.cpp
- * \author: Pablo Munoz
+/* 
+ * File:   OHCamera.cpp
+ * Author: Pablo Munoz
  * I am using Robot.cpp as a model. Thanks Mark for the contribution.
  * Created on May 12, 2011, 10:22 AM
  */
@@ -19,26 +19,29 @@ OHCamera::OHCamera(int cameraNum):mIOService(), mSocket(mIOService), endProgram(
   mTypeID = SID_OHCAMERA;
   uniqueRobotIdTracking = -1;
   ident_sent = false;
+  ident_proc = false;
   camera = cameraNum;
   sendCamposeApproved = false;
   
   skipFrame = 0;
-  robotArea = 600;
+  robotArea = 450;
   beatCircle = 15;
   beatIncrease = true;
   
   // Pablo: I am using this for testing. Please fix to read from Conf file
-  realGridUpLeftX = 124;
-  realGridUpLeftY = 50;
-  realGridUpRightX = 428;
-  realGridUpRightY = 50;
-  realGridDownLeftX = 120;
-  realGridDownLeftY = 287;
-  realGridDownRightX = 449; 
-  realGridDownRightY = 274;
-  tempWidth = 313;
-  tempHeigth = 230;
-  
+  realGridUpLeftX = -47;//124;
+  realGridUpLeftY = -13;//50;
+  realGridUpRightX =0; //428;
+  realGridUpRightY = 0;//50;
+  realGridDownLeftX = 0;//120;
+  realGridDownLeftY = 0;//287;
+  realGridDownRightX = 0;//449; 
+  realGridDownRightY = 0;//274;
+  tempWidth = 330;//313;
+  tempHeigth = 253;//230;
+
+  mapHeight = 200; 
+
   binaryThresholdMin = 220;
   binaryThresholdMax = 250;
   upperLeftCornerX = 50;
@@ -49,16 +52,6 @@ OHCamera::OHCamera(int cameraNum):mIOService(), mSocket(mIOService), endProgram(
   lowerLeftCornerY = 500;
   lowerRightCornerX = 500;
   lowerRightCornerY = 500;
-  
-  capture = 0;
-  capture = cvCaptureFromCAM(camera);
-  if(!capture)
-    {
-      cout<<"Could not initialize capturing...\n";
-      exit(1);
-    }
-  
-  cvNamedWindow("video", 1);
   
   drop = 0;
   
@@ -144,7 +137,7 @@ bool OHCamera::connect(const string& hostname, unsigned short port){
 	using namespace boost::system;
 	using namespace boost::asio;
 	
-	
+	cout << "Connecting...";
 	// Prepend function signature to error messages.
 	static const string signature = "OHCamera::Connect()";
 	
@@ -172,6 +165,19 @@ bool OHCamera::connect(const string& hostname, unsigned short port){
 	
 	// Go back to the initial state.
 	init_state();  
+	return true;
+}
+bool OHCamera::startCamera(){
+	capture = 0;
+	capture = cvCaptureFromCAM(camera);
+	if(!capture)
+    {
+		cout<<"Could not initialize capturing...\n";
+		return false;
+		//exit(1);
+    }
+	
+	cvNamedWindow("video", 1);
 	return true;
 }
 
@@ -224,17 +230,17 @@ void OHCamera::do_state_action_campose_send()
 	static const string signature = "OHCamera::do_state_campose_send()";
 	stringstream ss;
 	ss << CMD_CAMPOSE << " " << uniqueRobotIdTracking << " " << posX << " " << posY << " " << thetaR;
-	sleep(1);
+	//usleep(1);
 	if (write(ss)) {
-		cerr << signature << " - success; next state: STATE_IDLE" << endl;
+		//cerr << signature << " - success; next state: STATE_IDLE" << endl;
 		mStateTimer.start();
-		do_state_change(STATE_IDLE);
+		//do_state_change(STATE_IDLE);
 	} else if (mStateTimer.elapsed() >= MAX_TIME_STATE) {
 		cerr << signature << " - timeout; next state: STATE_QUIT" << endl;
 		do_state_change(STATE_QUIT);
 	} else {
 		cerr << signature << " - failure; next state: STATE_IDLE" << endl;
-		do_state_change(STATE_IDLE);
+		//do_state_change(STATE_IDLE);
 	}
 	
 }
@@ -347,10 +353,10 @@ void OHCamera::do_state_action_idle()
 			ident_sent = true;
 			return;
 		}
-		else if(uniqueRobotIdTracking != -1 && sendCamposeApproved){
-			do_state_change(STATE_CAMPOSE_SEND);
-			sendCamposeApproved = false;
-		}
+		//else if(uniqueRobotIdTracking != -1 && sendCamposeApproved){
+//			do_state_change(STATE_CAMPOSE_SEND);
+//			sendCamposeApproved = false;
+//		}
 	}
 }
 
@@ -422,6 +428,7 @@ void OHCamera::do_state_action_cmd_proc()
 				uniqueRobotIdTracking = robot_id; 
 				cout << "Unique Robot ID: " << uniqueRobotIdTracking << endl;
 			}
+			ident_proc = true;
 			cout << uniqueRobotIdTracking << endl; 
 			do_state_change(STATE_IDLE); return;
 		} else if(cmd.find(CMD_QUIT) != string::npos)
@@ -565,66 +572,75 @@ void OHCamera::do_state_action_ping_send()
 	}
 }
 
-int OHCamera::imageLoop(){
-	frame = cvQueryFrame(capture);
-	if(!frame)
-		return 0; //break;
-	
-	drop++;
-	if(drop%2==0){
-		return 0; //continue;
-	}
-	//finalFrame = doPyrDown(frame);
-	//finalFrame = cvCreateImage(cvSize(frame->width, frame->height), IPL_DEPTH_8U, 3);
-	gray_im = cvCreateImage(cvSize(frame->width, frame->height), IPL_DEPTH_8U, 1);
-	binary_im = cvCreateImage(cvSize(frame->width, frame->height), IPL_DEPTH_8U, 1);
-	cvCvtColor(frame, gray_im, CV_RGB2GRAY);
-	cvThreshold(gray_im, binary_im, binaryThresholdMin, binaryThresholdMax, CV_THRESH_BINARY); 
-	cvErode(binary_im, binary_im);
-	
-	findShapes(binary_im, robotArea, frame);
-	
-	//cout << "skipFrame = " << skipFrame << endl;
-	if(skipFrame==1){
-		cout << "No Robot" << endl;
+void OHCamera::imageLoop(){
+	while(true){ // TODO: Use bool
+		frame = cvQueryFrame(capture);
+		if(!frame)
+			return;//0; //break;
 		
-		//cvReleaseImage(&frame);
-		skipFrame =0;
-		cvShowImage("video", frame);
+		drop++;
+		if(drop%2==0){ // || drop%3==0){
+			return;// 0; //continue;
+		}
+		//finalFrame = doPyrDown(frame);
+		//finalFrame = cvCreateImage(cvSize(frame->width, frame->height), IPL_DEPTH_8U, 3);
+		gray_im = cvCreateImage(cvSize(frame->width, frame->height), IPL_DEPTH_8U, 1);//we changed finalFrame->frame
+		binary_im = cvCreateImage(cvSize(frame->width, frame->height), IPL_DEPTH_8U, 1);//we changed finalFrame->frame
+		cvCvtColor(frame, gray_im, CV_RGB2GRAY);//we changed finalFrame->frame
+		cvThreshold(gray_im, binary_im, binaryThresholdMin, binaryThresholdMax, CV_THRESH_BINARY); 
+		cvErode(binary_im, binary_im);
+		
+		findShapes(binary_im, robotArea, frame); //finalFrame);
+		
+		//cout << "skipFrame = " << skipFrame << endl;
+		if(skipFrame==1){
+			cout << "No Robot" << endl;
+			
+			//cvReleaseImage(&frame);
+			skipFrame =0;
+			cvShowImage("video", frame);//finalFrame);
+			//cvShowImage("processed", binary_im);
+			//cvReleaseImage(&finalFrame);
+			cvReleaseImage(&gray_im);
+			cvReleaseImage(&binary_im);
+			checkKey();
+			if(endProgram){
+				
+				exit(1); //TODO: Close everything.
+			}
+			return; // 0; //continue;
+		}
+		// Draw Grid for more accuracy
+		//cvLine(finalFrame, cvPoint(upperLeftCornerX, upperLeftCornerY),cvPoint(upperRightCornerX, upperRightCornerY) , cvScalar(255));
+		//cvLine(finalFrame, cvPoint(upperRightCornerX, upperRightCornerY),cvPoint(lowerRightCornerX, lowerRightCornerY) , cvScalar(255));
+		//cvLine(finalFrame, cvPoint(lowerRightCornerX, lowerRightCornerY),cvPoint(lowerLeftCornerX, lowerLeftCornerY) , cvScalar(255));
+		//cvLine(finalFrame, cvPoint(lowerLeftCornerX, lowerLeftCornerY),cvPoint(upperLeftCornerX, upperLeftCornerY) , cvScalar(255));
+		
+		// Approve sending the message to Skygrid
+		sendCamposeApproved = true;
+		
+		cvShowImage("video", frame);//finalFrame);
 		//cvShowImage("processed", binary_im);
+		checkKey();
+		
+		//binaryThresholdMin += 10;
+		//cout << binaryThresholdMin << endl;
+		//end = false;
+		//robotArea+= 5;
+		//cout << "Robot Area: " << robotArea << endl;
+		//checkKey();
+				
 		cvReleaseImage(&gray_im);
 		cvReleaseImage(&binary_im);
-		checkKey();
-
-		return 0; //continue;
-	}
-	// Draw Grid for more accuracy
-	//cvLine(frame, cvPoint(upperLeftCornerX, upperLeftCornerY),cvPoint(upperRightCornerX, upperRightCornerY) , cvScalar(255));
-	//cvLine(frame, cvPoint(upperRightCornerX, upperRightCornerY),cvPoint(lowerRightCornerX, lowerRightCornerY) , cvScalar(255));
-	//cvLine(frame, cvPoint(lowerRightCornerX, lowerRightCornerY),cvPoint(lowerLeftCornerX, lowerLeftCornerY) , cvScalar(255));
-	//cvLine(frame, cvPoint(lowerLeftCornerX, lowerLeftCornerY),cvPoint(upperLeftCornerX, upperLeftCornerY) , cvScalar(255));
-	
-	// Approve sending the message to Skygrid
-	sendCamposeApproved = true;
-	
-	cvShowImage("video", frame);
-	//cvShowImage("processed", binary_im);
-	checkKey();
-
-	//binaryThresholdMin += 10;
-	cout << binaryThresholdMin << endl;
-	//end = false;
-	//robotArea+= 5;
-	//cout << "Robot Area: " << robotArea << endl;
-	//checkKey();
-	if(endProgram){
-		disconnect();
-	}
-	
-	cvReleaseImage(&gray_im);
-	cvReleaseImage(&binary_im);
-	//cvReleaseImage(&finalFrame);
+		//cvReleaseImage(&finalFrame);
 		
+		if(endProgram){
+			disconnect();
+			exit(1);
+		}
+		
+	}
+	
 }
 
 
@@ -646,7 +662,7 @@ void OHCamera::findShapes(IplImage* img, int robotArea, IplImage* ret)
     int centery = 0;
     double deltaX = 0;
     double deltaY = 0;
-	double theta = 0;
+    double theta = 0;
 	
     CvSeq* contours;
     CvSeq* result;
@@ -664,7 +680,7 @@ void OHCamera::findShapes(IplImage* img, int robotArea, IplImage* ret)
 		
         result = cvApproxPoly(contours, sizeof(CvContour), storage,
 							  CV_POLY_APPROX_DP, cvContourPerimeter(contours)*0.02, 1);
-        if(result->total==4 && fabs(cvContourArea(result, CV_WHOLE_SEQ)) > robotArea-200 && fabs(cvContourArea(result, CV_WHOLE_SEQ)) < robotArea+200)
+        if(result->total==4 && fabs(cvContourArea(result, CV_WHOLE_SEQ)) > robotArea-100 && fabs(cvContourArea(result, CV_WHOLE_SEQ)) < robotArea+100)
         {
 			cout << "Robot Area: " << fabs(cvContourArea(result, CV_WHOLE_SEQ)) << endl;
 			//cout << "Robot Detected" << endl;
@@ -700,27 +716,36 @@ void OHCamera::findShapes(IplImage* img, int robotArea, IplImage* ret)
             cvCircle(ret, cvPoint(centerx, centery), 5, cvScalar(255));
             //Circle(img, center, radius, color, thickness=1, lineType=8, shift=0)
 			cout << "Robot is at: " << centerx << ", " << centery << endl;
+
+			double avgDeltaX = 0;
+			double avgDeltaY = 0;
 			
 			// Theta
 			if(getLineLength(pt[0], pt[1]) > getLineLength(pt[1], pt[2])){
-				// 0 - 1 and 2-3
+			  // 1-0 and 2-3
 				cvLine(ret, cvPoint(p0x, p0y), cvPoint(p1x, p1y), cvScalar(50), 3);
 				cvLine(ret, cvPoint(p2x, p2y), cvPoint(p3x, p3y), cvScalar(50), 3);
 				
+				// to get the correct theta camera y coordinate has to be converted according 
+				// to map (0,0) which is bottom left corner.
+				int map_p0y = mapHeight - (realGridUpLeftY + (tempHeigth * p0y)/ret->height);  
+				int map_p1y = mapHeight - (realGridUpLeftY + (tempHeigth * p1y)/ret->height);  
+				int map_p2y = mapHeight - (realGridUpLeftY + (tempHeigth * p2y)/ret->height);  
+				int map_p3y = mapHeight - (realGridUpLeftY + (tempHeigth * p3y)/ret->height);  
 				
 				deltaX = (double)p1x - p0x;
 				if(deltaX == 0){
 					deltaX = 0.01;
 				}
-				deltaY = (double)(p1y - p0y);
-				double avgDeltaX = deltaX;
-				double avgDeltaY = deltaY;
+				deltaY = (double)(map_p1y - map_p0y);
+				avgDeltaX = deltaX;
+				avgDeltaY = deltaY;
 				
-				deltaX = (double)p3x - p2x;
+				deltaX = (double)p2x - p3x;
 				if(deltaX == 0){
 					deltaX = 0.01;
 				}
-				deltaY = (double)p3y-p2y;
+				deltaY = (double)(map_p2y - map_p3y);
 				avgDeltaX += deltaX;
 				avgDeltaY += deltaY;
 				
@@ -728,63 +753,49 @@ void OHCamera::findShapes(IplImage* img, int robotArea, IplImage* ret)
 				avgDeltaY /= 2;
 				
 				theta = atan2(avgDeltaY, avgDeltaX);
-				
 			}
 			else {
-				// 1 - 2 and 3-0
-				//cout << "Here" << endl;
-				//cout << "p2: " << p2x << ", " << p2y << endl;
-				//cout << "p1: " << p1x << ", " << p1y << endl;
-				
 				cvLine(ret, cvPoint(p1x, p1y), cvPoint(p2x, p2y), cvScalar(50), 3);
 				cvLine(ret, cvPoint(p0x, p0y), cvPoint(p3x, p3y), cvScalar(50), 3);
 				
-				
+				// to get the correct theta camera y coordinate has to be converted according 
+				// to map (0,0) which is bottom left corner.
+				int map_p0y = mapHeight - (realGridUpLeftY + (tempHeigth * p0y)/ret->height);  
+				int map_p1y = mapHeight - (realGridUpLeftY + (tempHeigth * p1y)/ret->height);  
+				int map_p2y = mapHeight - (realGridUpLeftY + (tempHeigth * p2y)/ret->height);  
+				int map_p3y = mapHeight - (realGridUpLeftY + (tempHeigth * p3y)/ret->height);  
+								
 				deltaX = (double)p2x - p1x;
 				if(deltaX == 0){
 					deltaX = 0.01;
 				}
-				deltaY = (double)(p2y - p1y);
+				deltaY = (double)(map_p2y - map_p1y);
 				
+				avgDeltaX = deltaX;
+				avgDeltaY = deltaY;
 				
-				//double avgDeltaX = deltaX;
-				//double avgDeltaY = deltaY;
+				deltaX = (double)p3x - p0x;
+				if(deltaX == 0){
+					deltaX = 0.01;
+				}
+				deltaY = (double)(map_p3y - map_p0y);
+				avgDeltaX += deltaX;
+				avgDeltaY += deltaY;
 				
-				//deltaX = (double)p3x - p0x;
-				//if(deltaX == 0){
-				//	deltaX = 0.01;
-				//}
-				//deltaY = (double)p3y-p0y;
-				//avgDeltaX += deltaX;
-				//avgDeltaY += deltaY;
+				avgDeltaX /= 2;
+				avgDeltaY /= 2;
 				
-				//avgDeltaX /= 2;
-				//avgDeltaY /= 2;
-				
-				//theta = atan2(avgDeltaY, avgDeltaX);
-				theta = atan2(deltaX, deltaY);
-				
-				
+				theta = atan2(avgDeltaY, avgDeltaX);
 			}
-			theta += M_PI/2; 
-			if( (theta > M_PI) )
-                theta = theta-(2*M_PI);
 			
-			//            angle = M_PI - angle;
-			//        if((deltaX < 0 && deltaY < 0)||(deltaX > 0 && deltaY > 0)){
-			//            angle += M_PI/2;//-1 * (M_PI - angle);
-			//        }
-			//        if(deltaX < 0 && deltaY >0){
-			//            angle += M_PI;
-			//        }
-			
-			
-			theta = (theta *180)/M_PI;
+			// controller uses radians not degrees
+			//theta = (theta *180)/M_PI;
+
 			// Show data on Screen
 			cvCircle(ret, cvPoint(centerx, centery), beatCircle, cvScalar(255));
 			
 			centerx = realGridUpLeftX + (tempWidth*centerx)/ret->width;
-			centery = realGridUpLeftY + (tempHeigth*centery)/ret->height;
+			centery = mapHeight - (realGridUpLeftY + (tempHeigth*centery)/ret->height);
 			
 			
 			cout << "Robot in Grid is at: " << centerx << ", " << centery << ", " << theta << endl;

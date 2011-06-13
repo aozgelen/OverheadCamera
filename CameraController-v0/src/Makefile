@@ -10,7 +10,7 @@ METROUTIL_INC 	= $(METROUTIL_DIR)/include
 INC_FLAGS	= -I$(METROUTIL_INC)
 CPPFLAGS	= $(INC_FLAGS) `pkg-config --cflags opencv`
 CXXFLAGS      	= -c -g #-Wall
-LIBS   		= -lboost_system-mt `pkg-config --libs opencv` -L$(METROUTIL_LIB) -lMetrobotics 
+LIBS   		= -lboost_system-mt `pkg-config --libs opencv` -L$(METROUTIL_LIB) -lMetrobotics -lboost_thread-mt
 
 .SUFFIXES:
 .SUFFIXES: .o .cpp

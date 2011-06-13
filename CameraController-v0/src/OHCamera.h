@@ -9,6 +9,7 @@
 #define	OHCAMERA_H
 
 #include <boost/asio.hpp>
+#include <boost/thread.hpp>
 #include "metrobotics.h"
 
 
@@ -31,12 +32,28 @@ class OHCamera {
   int  getState() const { return mCurrentState;}
   void update();
   bool connect(const string& hostname, unsigned short port);
+  bool startCamera();
   void disconnect();
   void init_state();
+	
+  boost::thread * cameraThread;
+  void camBeat(){
+		while(true){
+			//cout << "In thread " << endl;
+			if(uniqueRobotIdTracking != -1 && sendCamposeApproved && ident_proc){
+			//if(sendCamposeApproved && ident_proc){
+				do_state_action_campose_send();
+				sendCamposeApproved = false;
+				
+			}
+			usleep(500);
+		}
+  }
   
  private:
   int uniqueRobotIdTracking; // For now we are tracking only one robot. 
   bool ident_sent;
+  bool ident_proc;
   bool endProgram; 
   bool sendCamposeApproved;
   
@@ -63,7 +80,8 @@ class OHCamera {
   int realGridDownRightY;
   int tempWidth;
   int tempHeigth;
-  
+  int mapHeight; 
+
   int camera;
   int binaryThresholdMin;
   int binaryThresholdMax;
@@ -117,8 +135,11 @@ class OHCamera {
   int getLineLength(CvPoint* p0, CvPoint * p1);
   void findShapes(IplImage* img, int robotArea, IplImage* ret);
   int getImage(int argc, char ** argv); // old main. 
-  int imageLoop();
+  void imageLoop();
   void checkKey();	
+  
+	
+  
 };
 
 #endif	/* OHCAMERA_H */
