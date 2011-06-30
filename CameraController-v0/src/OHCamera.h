@@ -1,7 +1,7 @@
 /* 
  * File:   OHCamera.h
  * Author: Pablo Munoz
- * * I am using Robot.cpp as a model
+ * * I am using Robot.cpp as a model. Thanks Mark for the contribution.
  * Created on May 12, 2011, 10:22 AM
  */
 
@@ -40,8 +40,8 @@ class OHCamera {
   void camBeat(){
 		while(true){
 			//cout << "In thread " << endl;
-			if(uniqueRobotIdTracking != -1 && sendCamposeApproved && ident_proc){
-			//if(sendCamposeApproved && ident_proc){
+			//if(uniqueRobotIdTracking != -1 && sendCamposeApproved && ident_proc){
+			if(sendCamposeApproved && ident_proc){
 				do_state_action_campose_send();
 				sendCamposeApproved = false;
 				
@@ -133,6 +133,7 @@ class OHCamera {
   
   IplImage* doPyrDown( IplImage* in, int filter = IPL_GAUSSIAN_5x5);
   int getLineLength(CvPoint* p0, CvPoint * p1);
+  void getMidPoint(CvPoint* p0, CvPoint * p1, CvPoint &midPoint);
   void findShapes(IplImage* img, int robotArea, IplImage* ret);
   int getImage(int argc, char ** argv); // old main. 
   void imageLoop();

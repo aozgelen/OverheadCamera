@@ -178,6 +178,7 @@ bool OHCamera::startCamera(){
     }
 	
 	cvNamedWindow("video", 1);
+	//cvNamedWindow("processed", 1);
 	return true;
 }
 
@@ -644,9 +645,7 @@ void OHCamera::imageLoop(){
 }
 
 
-int OHCamera::getLineLength(CvPoint* p0, CvPoint * p1){
-	return sqrt(pow((double)(p1->x - p0->x),2) + pow((double)(p1->y - p0->y),2)) ;
-}
+
 
 IplImage* OHCamera::doPyrDown( IplImage* in, int	filter){
 	
@@ -680,9 +679,9 @@ void OHCamera::findShapes(IplImage* img, int robotArea, IplImage* ret)
 		
         result = cvApproxPoly(contours, sizeof(CvContour), storage,
 							  CV_POLY_APPROX_DP, cvContourPerimeter(contours)*0.02, 1);
-        if(result->total==4 && fabs(cvContourArea(result, CV_WHOLE_SEQ)) > robotArea-100 && fabs(cvContourArea(result, CV_WHOLE_SEQ)) < robotArea+100)
+        if(result->total==4 && fabs(cvContourArea(result, CV_WHOLE_SEQ)) > robotArea-100 && fabs(cvContourArea(result, CV_WHOLE_SEQ)) < robotArea+100) // 4000
         {
-			cout << "Robot Area: " << fabs(cvContourArea(result, CV_WHOLE_SEQ)) << endl;
+			//cout << "Robot Area: " << fabs(cvContourArea(result, CV_WHOLE_SEQ)) << endl;
 			//cout << "Robot Detected" << endl;
             CvPoint *pt[4];
             for(int i=0;i<4;i++)
@@ -715,14 +714,34 @@ void OHCamera::findShapes(IplImage* img, int robotArea, IplImage* ret)
             //printf("Center Color Yellow x: %d y:%d\n", centerx, centery);
             cvCircle(ret, cvPoint(centerx, centery), 5, cvScalar(255));
             //Circle(img, center, radius, color, thickness=1, lineType=8, shift=0)
-			cout << "Robot is at: " << centerx << ", " << centery << endl;
+			//cout << "Robot is at: " << centerx << ", " << centery << endl;
 
 			double avgDeltaX = 0;
 			double avgDeltaY = 0;
 			
+			// For robotID
+			int circ1x; 
+            int circ1y;
+			int circ2x;
+			int circ2y;
+			
+
+			
+			//int lineMode = 0;
+			
 			// Theta
 			if(getLineLength(pt[0], pt[1]) > getLineLength(pt[1], pt[2])){
 			  // 1-0 and 2-3
+				
+				
+				// For robotID
+				//lineMode = 0;
+				circ1x = (pt[1]->x + pt[2]->x)/2;
+				circ1y = (pt[1]->y + pt[2]->y)/2;
+				circ2x = (pt[0]->x + pt[3]->x)/2;
+				circ2y = (pt[0]->y + pt[3]->y)/2;
+				
+				
 				cvLine(ret, cvPoint(p0x, p0y), cvPoint(p1x, p1y), cvScalar(50), 3);
 				cvLine(ret, cvPoint(p2x, p2y), cvPoint(p3x, p3y), cvScalar(50), 3);
 				
@@ -733,19 +752,19 @@ void OHCamera::findShapes(IplImage* img, int robotArea, IplImage* ret)
 				int map_p2y = mapHeight - (realGridUpLeftY + (tempHeigth * p2y)/ret->height);  
 				int map_p3y = mapHeight - (realGridUpLeftY + (tempHeigth * p3y)/ret->height);  
 				
-				deltaX = (double)p1x - p0x;
+				deltaX = fabs((double)p1x - p0x);
 				if(deltaX == 0){
 					deltaX = 0.01;
 				}
-				deltaY = (double)(map_p1y - map_p0y);
+				deltaY = fabs((double)(map_p1y - map_p0y));
 				avgDeltaX = deltaX;
 				avgDeltaY = deltaY;
 				
-				deltaX = (double)p2x - p3x;
+				deltaX = fabs((double)p2x - p3x);
 				if(deltaX == 0){
 					deltaX = 0.01;
 				}
-				deltaY = (double)(map_p2y - map_p3y);
+				deltaY = fabs((double)(map_p2y - map_p3y));
 				avgDeltaX += deltaX;
 				avgDeltaY += deltaY;
 				
@@ -755,6 +774,14 @@ void OHCamera::findShapes(IplImage* img, int robotArea, IplImage* ret)
 				theta = atan2(avgDeltaY, avgDeltaX);
 			}
 			else {
+				// 1-2and 0-3
+				// For robotID
+				//lineMode = 1;
+				circ1x = (pt[1]->x + pt[0]->x)/2;
+				circ1y = (pt[0]->y + pt[1]->y)/2;
+				circ2x = (pt[2]->x + pt[3]->x)/2;
+				circ2y = (pt[2]->y + pt[3]->y)/2;
+				
 				cvLine(ret, cvPoint(p1x, p1y), cvPoint(p2x, p2y), cvScalar(50), 3);
 				cvLine(ret, cvPoint(p0x, p0y), cvPoint(p3x, p3y), cvScalar(50), 3);
 				
@@ -765,20 +792,21 @@ void OHCamera::findShapes(IplImage* img, int robotArea, IplImage* ret)
 				int map_p2y = mapHeight - (realGridUpLeftY + (tempHeigth * p2y)/ret->height);  
 				int map_p3y = mapHeight - (realGridUpLeftY + (tempHeigth * p3y)/ret->height);  
 								
-				deltaX = (double)p2x - p1x;
+				deltaX = fabs((double)p2x - p1x);
 				if(deltaX == 0){
 					deltaX = 0.01;
 				}
-				deltaY = (double)(map_p2y - map_p1y);
+				deltaY = fabs((double)(map_p2y - map_p1y));
 				
+			
 				avgDeltaX = deltaX;
 				avgDeltaY = deltaY;
 				
-				deltaX = (double)p3x - p0x;
+				deltaX = fabs((double)p3x - p0x);
 				if(deltaX == 0){
 					deltaX = 0.01;
 				}
-				deltaY = (double)(map_p3y - map_p0y);
+				deltaY = fabs((double)(map_p3y - map_p0y));
 				avgDeltaX += deltaX;
 				avgDeltaY += deltaY;
 				
@@ -788,17 +816,188 @@ void OHCamera::findShapes(IplImage* img, int robotArea, IplImage* ret)
 				theta = atan2(avgDeltaY, avgDeltaX);
 			}
 			
+			
+			
+			
 			// controller uses radians not degrees
 			//theta = (theta *180)/M_PI;
+			
 
-			// Show data on Screen
+			//Show data on Screen
 			cvCircle(ret, cvPoint(centerx, centery), beatCircle, cvScalar(255));
 			
-			centerx = realGridUpLeftX + (tempWidth*centerx)/ret->width;
-			centery = mapHeight - (realGridUpLeftY + (tempHeigth*centery)/ret->height);
+			/* For RobotID. Old Approach
+
+			// Line in middle.			
+			cvLine(ret, cvPoint(circ1x, circ1y), cvPoint(circ2x, circ2y), cvScalar(50), 1);
+
+			cvCircle(ret, cvPoint(circ1x, circ1y), 5, cvScalar(255));
+			cvCircle(ret, cvPoint(circ2x, circ2y), 5, cvScalar(255));
+			CvLineIterator it; // TODO: ret or img
+			int count = cvInitLineIterator(img,cvPoint(circ1x, circ1y), cvPoint(circ2x, circ2y), &it, 8, 1);
+			int north = 0;
+			int south = 0;
+			int offset, x, y;
+			for(int i=0; i < count; i++){
+				//cout << i << " " <<  it.ptr[0] << " " << it.ptr[1] << " " << it.ptr[2] << "." << endl;
+				cout << i << " " << (int)it.ptr[i];
+				CV_NEXT_LINE_POINT(it);
+
+				{
+				
+				offset = it.ptr - (uchar*)(img->imageData);
+				y = offset/img->widthStep;
+				x = (offset - y*img->widthStep)/(3*sizeof(uchar));
+				cout << x << ", " << y << endl;
+
+				}
+				//cout << (circ1y + circ2y)/2 << " " << circ1y << " " << circ2y << endl;
+				if(y > (circ1y+circ2y)/2 && it.ptr[i] > 220){ 
+					south++;
+					cout << "south " << endl;
+				}
+				if(y < (circ1y+circ2y)/2 && it.ptr[i] > 220)
+				{				
+					north++;
+					cout << "north " << endl;
+				}		
+			}
+			if(north>south)
+				cout << "NORTH " << north << " SOUTH " << south << endl;
+			else
+				cout << "SOUTH " << south << " NORTH " << north << endl;
+
+			END OF ROBOT TESTING */
+
+
+			// Get Robot Id. Put this in a different function. AND CALL IT FROM INSIDE RECTANGLES's LOOP!!! THis works only for 1.
+			CvPoint * ArI;
+			uchar * mVal = (uchar *)img->imageData;
+			int step = img->widthStep/sizeof(uchar);
+			// TODO: Infer all the other points from ArI
+			CvPoint * AbD;
+			CvPoint * AbI;
+			CvPoint * ArD;
+			if(getLineLength(pt[0], pt[1]) < getLineLength(pt[0], pt[3])){
+				if(pt[0]->x < pt[1]->x){
+					ArI = pt[0];
+					AbD = pt[2];
+					AbI = pt[3];
+					ArD = pt[1];
+				}	
+				else {
+					ArI = pt[1];
+					AbD = pt[3];
+					AbI = pt[2];
+					ArD = pt[0];
+
+				}
+			}
+			else{
+				if(pt[0]->x < pt[3]->x){
+					ArI = pt[0];
+					AbD = pt[2];
+					AbI = pt[1];
+					ArD = pt[3];
+				}
+				else {
+					ArI = pt[3];
+					AbD = pt[1];
+					AbI = pt[2];
+					ArD = pt[0];
+				}
+			}
+
 			
 			
-			cout << "Robot in Grid is at: " << centerx << ", " << centery << ", " << theta << endl;
+			// Make this more efficient.
+			CvPoint ArIMark;// = new CvPoint(); 
+			CvPoint AbDMark;// = new CvPoint();
+			CvPoint AbIMark; // = new CvPoint(); 
+			CvPoint ArDMark;
+			getMidPoint(ArI, &cvPoint(centerx, centery), ArIMark); //TODO: Fix this
+			getMidPoint(AbD, &cvPoint(centerx, centery), AbDMark); 
+			getMidPoint(AbI, &cvPoint(centerx, centery), AbIMark);
+			getMidPoint(ArD, &cvPoint(centerx, centery), ArDMark);
+			//cvLine(ret, cvPoint(ArIMark.x, 0), cvPoint(ArIMark.x, ret->height), cvScalar(50), 1);			
+			//cvLine(ret, cvPoint(0, ArIMark.y), cvPoint(ret->width, ArIMark.y), cvScalar(50), 1);
+			//cvLine(ret, cvPoint(AbDMark.x, 0), cvPoint(AbDMark.x, ret->height), cvScalar(150), 1);			
+			//cvLine(ret, cvPoint(0, AbDMark.y), cvPoint(ret->width, AbDMark.y), cvScalar(150), 1);
+			
+			CvScalar ArIScal, AbDScal, AbIScal, ArDScal;
+			ArIScal = cvGet2D(img, ArIMark.y, ArIMark.x);
+			AbDScal = cvGet2D(img, AbDMark.y, AbDMark.x);
+			AbIScal = cvGet2D(img, AbIMark.y, AbIMark.x);
+			ArDScal = cvGet2D(img, ArDMark.y, ArDMark.x);
+
+//			for(int i=-3; i<4; i++){
+//				y+=i;
+//				for(int j=-3; j<4; j++){
+//					x+= j;
+//					cout << (int)mVal[(y)*step+(x)] << " ";
+//					s = cvGet2D(img, y, x);
+//					cout << "s: " << y << ", " << x << " "  << s.val[0];
+
+//				}
+//			}
+//			cout << endl;
+
+//			x = AbDMark->x;
+//			y = AbDMark->y;
+//			cout << "AbDMark: " << x << ", " << y << endl;
+//
+//			for(int i=-3; i<4; i++){
+//				x+=i;
+//				for(int j=-3; j<4; j++){		
+//					y+=j;
+//					cout << (int)mVal[(y)*step+(x)] << " ";
+//					s = cvGet2D(img, y , x);
+//					cout << "s: " << x << ", " << y << " "  << s.val[0];
+//				}
+//			}
+//			cout << endl;
+//			for(int i=0; i<img->height-1; i++){
+//				for(int j=0; j<img->width-1; j++){
+//					s = cvGet2D(img, i, j);
+//					if(s.val[0] > 0){
+//						cout << "(" << i <<", " << j << "): " << s.val[0] << endl;			
+//						cout << "ArIMark: " << x << ", " << y << endl;
+//					}
+//				}
+//			}
+
+			//TODO: CHANGE ID POINTS FOR PRIMITIVE POINTS.
+			int id = 1;
+			if(ArIScal.val[0] != AbDScal.val[0]){
+			
+				if(ArIScal.val[0] > AbDScal.val[0]){
+					if(ArI->x < AbI->x){
+						theta = -theta; //-= M_PI;				
+					}
+					else{
+						theta = (-M_PI)+theta;
+					}
+				}	
+				else {
+					if(ArI->x < AbI->x){
+						theta = M_PI - theta;
+					}
+				}
+				if(ArDScal.val[0] == 0)
+					id++;
+				if(AbIScal.val[0] == 0)
+					id++;
+				cout << "Robot " << id << " identified" << endl;
+				centerx = realGridUpLeftX + (tempWidth*centerx)/ret->width;
+				centery = mapHeight - (realGridUpLeftY + (tempHeigth*centery)/ret->height);				
+				cout << "Robot " << id << " pos: " << centerx << ", " << centery << ", " << theta << endl;
+				
+			}
+			else {
+				cout << "UO";
+			}
+
+			// End of Robot Id.			
 			
 			posX = centerx;
 			posY = centery;
@@ -851,4 +1050,12 @@ void OHCamera::checkKey(){
 			endProgram = true;
 			break;
 	}
+}
+int OHCamera::getLineLength(CvPoint* p0, CvPoint * p1){
+	return sqrt(pow((double)(p1->x - p0->x),2) + pow((double)(p1->y - p0->y),2)) ;
+}
+
+void OHCamera::getMidPoint(CvPoint* p0, CvPoint * p1, CvPoint & midPoint){
+	midPoint.x = (p0->x + p1->x)/2;
+	midPoint.y = (p0->y + p1->y)/2;
 }
